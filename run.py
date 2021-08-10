@@ -1,11 +1,12 @@
 from pypylon import pylon
-
+from datetime import datetime
 from pypylon import genicam
 from pypylon import pylon
 import sys
 
 left_serial = "40098270"
 right_serial = "40098281"
+log_filepath = "temp.log"
 
 # Number of images to be grabbed.
 countOfImagesToGrab = 10
@@ -45,11 +46,15 @@ try:
     # set up for free-running continuous acquisition.
     cameras.StartGrabbing()
 
+    for i, cam in enumerate(cameras):
+        cam.AcquisitionFrameRate.SetValue(0.1)
+        cam.AcquisitionFrameRateEnable.SetValue(True)
+
     while True:
         if not cameras.IsGrabbing():
             break
 
-        grabResult = cameras.RetrieveResult(5000, pylon.TimeoutHandling_ThrowException)
+        grabResult = cameras.RetrieveResult(20000, pylon.TimeoutHandling_ThrowException)
 
         # When the cameras in the array are created the camera context value
         # is set to the index of the camera in the array.
@@ -68,6 +73,13 @@ try:
         # Get temporature
         temp = cameras[cameraContextValue].DeviceTemperature.GetValue()
         print("Temp: ", temp)
+
+        timestamp = datetime.now().strftime("%d-%b-%Y (%H:%M:%S.%f)")
+        log_msg = str(cameraContextValue) + "," + timestamp + "," + str(temp) + "\n"
+
+        f = open(log_filepath, "a")
+        f.write(log_msg)
+        f.close()
 
 
 except genicam.GenericException as e:
