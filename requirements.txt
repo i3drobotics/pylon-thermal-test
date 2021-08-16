@@ -1,1 +1,2 @@
 pypylon
+opencv-python
