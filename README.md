@@ -9,12 +9,12 @@ These tests include the following:
 To test a Titania system, plug the camera USB into a USB 3.0 port on your machine.  
 Then run the test with the python test script:
 ```
-python run_test.py
+python run.py
 ```
 ### Options
 The following options are available on the command line to setup the type of test that will be run on the device. Each option is available as a command line parameter and should be run with the following format:
 ```
-python run_test.py --option variable
+python run.py --option variable
 ```
 | Option        | Type    | Description                                                                                                                            | Default |
 |---------------|---------|----------------------------------------------------------------------------------------------------------------------------------------|---------|
