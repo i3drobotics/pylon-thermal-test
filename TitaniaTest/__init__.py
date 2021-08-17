@@ -2,6 +2,7 @@ import sys
 import os
 import time
 import random
+import datetime
 from typing import NamedTuple
 from pypylon import pylon, genicam
 import cv2
@@ -16,6 +17,12 @@ class TitaniaTestParams(NamedTuple):
     save_images: bool
     capture_temperature: bool
     virtual_camera: bool
+
+
+def convertToExcelDate(date1):
+    temp = datetime.datetime(1899, 12, 30)    # Note, not 31st Dec but 30th!
+    delta = date1 - temp
+    return float(delta.days) + (float(delta.seconds) / 86400)
 
 
 def validateTitaniaTestParams(test_params: TitaniaTestParams) -> bool:
@@ -86,22 +93,24 @@ def getCameraSerials() -> list:
 
             # Print the serial of the camera.
             cam_serial = cam.GetDeviceInfo().GetSerialNumber()
-            print("Serial: ", cam_serial)
             serial_list.append(cam_serial)
 
         return serial_list
 
     except genicam.GenericException as e:
         # Error handling
-        print("An exception occurred.", e)
+        print("An exception occurred when getting camera serials.", e)
         return []
 
 
 def getLogFileName() -> str:
-    # Get current unix time
-    unix_time = str(int(time.time()))
+    # Get current time
+    time_now = datetime.datetime.now()
+    # Convert to excel datetime serial
+    excel_time = convertToExcelDate(time_now)
+    timestamp = str(excel_time)
     # Create file name from unix time
-    log_file_name = "TT_" + unix_time + ".txt"
+    log_file_name = "TitaniaTest_" + timestamp + ".txt"
     return log_file_name
 
 
@@ -171,10 +180,20 @@ def run(test_params: TitaniaTestParams) -> int:
         save_rate = test_params.save_rate
         last_save_time = time.time()
 
+    except genicam.GenericException as e:
+        # Error handling
+        print("Camera exception occurred during test setup: ", e)
+        exit_code = 1
+        return exit_code
+
+    try:
         while True:
             # Get capture time
-            capture_time = time.time()
-            capture_time = "{:10.4F}".format(capture_time)
+            time_now = datetime.datetime.now()
+            # Convert to excel datetime serial
+            excel_time = convertToExcelDate(time_now)
+            capture_time = "{:.8F}".format(excel_time)
+
             # Define default values for log data
             left_temp = ""
             right_temp = ""
@@ -247,14 +266,16 @@ def run(test_params: TitaniaTestParams) -> int:
                 f = open(log_filepath, "a")
                 f.write(log_msg)
                 f.close()
-
+    except KeyboardInterrupt:
+        # Error handling
+        print("Test stopped.")
+        exit_code = 0
+        return exit_code
     except genicam.GenericException as e:
         # Error handling
-        print("An exception occurred.", e)
+        print("Camera exception occurred during test: ", e)
         exit_code = 1
-
-    return exit_code
-
+        return exit_code
 
 # Entry point used to debug Titania Test
 def main() -> int:
@@ -263,7 +284,7 @@ def main() -> int:
     left_serial = ""
     right_serial = ""
     output_folderpath = "."
-    capture_rate = 1.0
+    capture_rate = 10.0
     save_rate = 1.0
     save_images = True
     capture_temp = True

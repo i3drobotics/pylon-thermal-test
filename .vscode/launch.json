@@ -16,7 +16,10 @@
             "type": "python",
             "request": "launch",
             "program": "${workspaceFolder}/run.py",
-            "args": ["--virtual", "true"],
+            "args": [
+                "--virtual", "True",
+                "--save_images", "False"
+            ],
             "console": "integratedTerminal"
         }
     ],

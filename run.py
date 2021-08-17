@@ -11,8 +11,10 @@ def parse_args() -> argparse.Namespace:
         Folderpath to store test results. \n \
         Test data includes log file of results and \
         any images captured during the test.")
-    parser.add_argument('--rate', type=float, default=1, help="\
+    parser.add_argument('--capture_rate', type=float, default=1, help="\
         Data capture rate (frames per second). All data is captured in sync.")
+    parser.add_argument('--save_rate', type=float, default=1, help="\
+        Data save rate (frames per second). MUST be less than or equal to capture_rate.")
     parser.add_argument('--capture_temp', type=bool, default=True, help="\
         Enable / disable capturing of temperature data \
         from cameras during test.")
@@ -48,6 +50,9 @@ def parse_args() -> argparse.Namespace:
     if not os.path.exists(args.output):
         err_msg = "Output path does not exist: " + args.output
         raise Exception(err_msg)
+    # Save rate must be less than or equal to capture rate
+    if args.save_rate > args.capture_rate:
+        raise Exception("Save rate must be less than or equal to capture rate")
     return args
 
 
@@ -75,10 +80,11 @@ def main() -> int:
     test_params = TitaniaTest.TitaniaTestParams(
         left_serial=left_serial, right_serial=right_serial,
         output_folderpath=args.output,
-        capture_rate=args.rate,
-        save_images=args.capture_image,
+        capture_rate=args.capture_rate,
+        save_rate=args.save_rate,
+        save_images=args.save_images,
         capture_temperature=args.capture_temp,
-        virtual_camera=args.virtual
+        virtual_camera=args.virtual,
     )
     TitaniaTest.validateTitaniaTestParams(test_params)
     # Run test
