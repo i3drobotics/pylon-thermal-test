@@ -85,7 +85,7 @@ def validateTitaniaTestParams(test_params: TitaniaTestParams) -> bool:
         raise Exception("Save FPS must be less than or equal to capture FPS")
 
 
-def enableCameraEmulation(enable):
+def enableCameraEmulation(enable: bool):
     if enable:
         os.environ["PYLON_CAMEMU"] = "2"
     else:
