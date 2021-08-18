@@ -17,8 +17,13 @@
             "request": "launch",
             "program": "${workspaceFolder}/run.py",
             "args": [
-                "--virtual", "True",
-                "--save_images", "False"
+                // "--virtual",
+                // "--disable_images",
+                // "--left_serial","40091829",
+                // "--right_serial","40098273",
+                "--titania_serial","746974616e24318",
+                "--capture_fps","10",
+                "--save_fps","10"
             ],
             "console": "integratedTerminal"
         }

@@ -11,15 +11,16 @@ def parse_args() -> argparse.Namespace:
         Folderpath to store test results. \n \
         Test data includes log file of results and \
         any images captured during the test.")
-    parser.add_argument('--capture_rate', type=float, default=1, help="\
+    parser.add_argument('--capture_fps', type=float, default=1, help="\
         Data capture rate (frames per second). All data is captured in sync.")
-    parser.add_argument('--save_rate', type=float, default=1, help="\
-        Data save rate (frames per second). MUST be less than or equal to capture_rate.")
-    parser.add_argument('--capture_temp', type=bool, default=True, help="\
-        Enable / disable capturing of temperature data \
+    parser.add_argument('--save_fps', type=float, default=1, help="\
+        Data save rate (frames per second). \
+        MUST be less than or equal to capture_fps.")
+    parser.add_argument('--disable_temp', action='store_true', help="\
+        Disable capturing of temperature data \
         from cameras during test.")
-    parser.add_argument('--save_images', type=bool, default=True, help="\
-        Enable / disable saving of images during. \
+    parser.add_argument('--disable_images', action='store_true', help="\
+        Disable saving of images during. \
         Image will still be grabbed from camera but \
         will not be saved to file.")
     parser.add_argument('--left_serial', type=str, default="", help="\
@@ -30,7 +31,10 @@ def parse_args() -> argparse.Namespace:
         Camera serial number for right camera. \
         If not specified will connect to first two \
         basler cameras found connected.")
-    parser.add_argument('--virtual', type=bool, default=False, help="\
+    parser.add_argument('--titania_serial', type=str, default="", help="\
+        Titania unique serial number. \
+        Found printed on the back of Titania.")
+    parser.add_argument('--virtual', action='store_true', help="\
         Enable camera emulation. Useful for testing. \
         Cameras are expected with serials '0815-0000' & '0815-0001'")
     args = parser.parse_args()
@@ -38,6 +42,7 @@ def parse_args() -> argparse.Namespace:
     # If one camera serial is given then both must be given
     left_serial_given = args.left_serial != ""
     right_serial_given = args.right_serial != ""
+    titania_serial_given = args.titania_serial != ""
     if left_serial_given and not right_serial_given:
         err_msg = "left_serial given without right_serial. \
             Both left and right MUST be given if specifing camera serials."
@@ -46,13 +51,18 @@ def parse_args() -> argparse.Namespace:
         err_msg = "right_serial given without left_serial. \
             Both left and right MUST be given if specifing camera serials."
         raise Exception(err_msg)
+    if titania_serial_given and (left_serial_given or right_serial_given):
+        err_msg = "Cannot specify titania_serial \
+            and left_serial or right_serial. If you have titania serial \
+            left_serial and right_serial are no longer requred."
+        raise Exception(err_msg)
     # Check output path exists
     if not os.path.exists(args.output):
         err_msg = "Output path does not exist: " + args.output
         raise Exception(err_msg)
     # Save rate must be less than or equal to capture rate
-    if args.save_rate > args.capture_rate:
-        raise Exception("Save rate must be less than or equal to capture rate")
+    if args.save_fps > args.capture_fps:
+        raise Exception("Save FPS must be less than or equal to capture FPS")
     return args
 
 
@@ -65,13 +75,22 @@ def main() -> int:
     right_serial = None
     if args.left_serial != "":
         # If serials are specified then check they are connected
-        TitaniaTest.checkSerialPairConnected(left_serial, right_serial)
+        TitaniaTest.checkSerialPairConnected(
+            args.left_serial, args.right_serial)
         left_serial = args.left_serial
         right_serial = args.right_serial
     if args.left_serial == "":
-        # If serials are not specifed then
-        # check only two cameras are connected and get their serials
-        left_serial, right_serial = TitaniaTest.getSerialPairConnected()
+        if args.titania_serial == "":
+            # If serials are not specifed then
+            # check only two cameras are connected and get their serials
+            left_serial, right_serial = TitaniaTest.getSerialPairConnected()
+        if args.titania_serial != "":
+            # If titania serial is specified then
+            # get the left and right camera from the unique serial.
+            # Requires the camera is connected to read the valid serials.
+            left_serial, right_serial = \
+                TitaniaTest.getLeftRightSerialFromTitaniaSerial(
+                    args.titania_serial)
     if left_serial is None or right_serial is None:
         # This shouldn't be possible as previous error checking
         # should always set serials or raise an exception
@@ -80,10 +99,10 @@ def main() -> int:
     test_params = TitaniaTest.TitaniaTestParams(
         left_serial=left_serial, right_serial=right_serial,
         output_folderpath=args.output,
-        capture_rate=args.capture_rate,
-        save_rate=args.save_rate,
-        save_images=args.save_images,
-        capture_temperature=args.capture_temp,
+        capture_fps=args.capture_fps,
+        save_fps=args.save_fps,
+        save_images=(not args.disable_images),
+        capture_temperature=(not args.disable_temp),
         virtual_camera=args.virtual,
     )
     TitaniaTest.validateTitaniaTestParams(test_params)

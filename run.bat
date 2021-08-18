@@ -1,0 +1,1 @@
+python run.py --left_serial 40091829 --right_serial 40098273 --capture_fps 30 --save_fps 30 --output "."
