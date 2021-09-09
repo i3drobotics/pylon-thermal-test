@@ -11,9 +11,9 @@ def parse_args() -> argparse.Namespace:
         Folderpath to store test results. \n \
         Test data includes log file of results and \
         any images captured during the test.")
-    parser.add_argument('--capture_fps', type=float, default=1, help="\
+    parser.add_argument('--capture_fps', type=float, default=1.0, help="\
         Data capture rate (frames per second). All data is captured in sync.")
-    parser.add_argument('--save_fps', type=float, default=1, help="\
+    parser.add_argument('--save_fps', type=float, default=1.0, help="\
         Data save rate (frames per second). \
         MUST be less than or equal to capture_fps.")
     parser.add_argument('--disable_temp', action='store_true', help="\
@@ -37,6 +37,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument('--virtual', action='store_true', help="\
         Enable camera emulation. Useful for testing. \
         Cameras are expected with serials '0815-0000' & '0815-0001'")
+    parser.add_argument('--timeout', type=float, default=0.0, help="\
+        Maximum time to run test (seconds).")
     args = parser.parse_args()
     # Check arguments are valid
     # If one camera serial is given then both must be given
@@ -56,6 +58,8 @@ def parse_args() -> argparse.Namespace:
             and left_serial or right_serial. If you have titania serial \
             left_serial and right_serial are no longer requred."
         raise Exception(err_msg)
+    if args.timeout < 0.0:
+        raise Exception("Timeout must be positive number in seconds.")
     # Check output path exists
     if not os.path.exists(args.output):
         err_msg = "Output path does not exist: " + args.output
@@ -104,6 +108,7 @@ def main() -> int:
         save_images=(not args.disable_images),
         capture_temperature=(not args.disable_temp),
         virtual_camera=args.virtual,
+        timeout=args.timeout
     )
     TitaniaTest.validateTitaniaTestParams(test_params)
     # Run test

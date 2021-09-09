@@ -1,1 +1,2 @@
-python run.py --left_serial 40091829 --right_serial 40098273 --capture_fps 30 --save_fps 30 --output "."
+python run.py --left_serial 40098266 --right_serial 40098271 --capture_fps 10 --save_fps 10 --timeout 10.0 --output "./out/startup"
+python run.py --left_serial 40098266 --right_serial 40098271 --capture_fps 10 --save_fps 0.1 --timeout 0.0 --output "./out/main"

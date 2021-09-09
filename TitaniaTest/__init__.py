@@ -19,6 +19,7 @@ class TitaniaTestParams(NamedTuple):
     save_images: bool
     capture_temperature: bool
     virtual_camera: bool
+    timeout: float
 
 
 def getLeftRightSerialFromTitaniaSerial(titania_serial: str) -> str:
@@ -231,7 +232,14 @@ def run(test_params: TitaniaTestParams) -> int:
         return exit_code
 
     try:
+        start_time = time.time()
         while True:
+            if test_params.timeout > 0:
+                test_duration = time.time() - start_time
+                if test_duration > test_params.timeout:
+                    exit_code = 0
+                    return exit_code
+
             # Get capture time
             time_now = datetime.datetime.now()
             # Convert to excel datetime serial
@@ -339,6 +347,7 @@ def main() -> int:
     output_folderpath = "."
     capture_fps = 10.0
     save_fps = 10.0
+    timeout = 0.0  # zero = no timeout
     save_images = True
     capture_temp = True
 
@@ -363,7 +372,8 @@ def main() -> int:
         save_fps=save_fps,
         save_images=save_images,
         capture_temperature=capture_temp,
-        virtual_camera=virtual_cams
+        virtual_camera=virtual_cams,
+        timeout=timeout
     )
     validateTitaniaTestParams(test_params)
     # Run test
