@@ -20,6 +20,7 @@ class TitaniaTestParams(NamedTuple):
     capture_temperature: bool
     virtual_camera: bool
     timeout: float
+    exposure: float
 
 
 def getLeftRightSerialFromTitaniaSerial(titania_serial: str) -> str:
@@ -200,13 +201,15 @@ def run(test_params: TitaniaTestParams) -> int:
         cameras.StartGrabbing(
             pylon.GrabStrategy_LatestImageOnly)
 
-        # Set capture rate
         for cam in cameras:
+            # Set capture rate
             if test_params.virtual_camera:
                 cam.AcquisitionFrameRateAbs.SetValue(test_params.capture_fps)
             else:
                 cam.AcquisitionFrameRate.SetValue(test_params.capture_fps)
             cam.AcquisitionFrameRateEnable.SetValue(True)
+            # Set exposure
+            cam.ExposureTime.SetValue(test_params.exposure)
 
         # Flip left camera images
         if not test_params.virtual_camera:
@@ -260,11 +263,16 @@ def run(test_params: TitaniaTestParams) -> int:
 
             # Check cameras are grabbing
             if grabbing:
-                # Read camera data
-                grabResult_left = cameras[0].RetrieveResult(
-                    20000, pylon.TimeoutHandling_ThrowException)
-                grabResult_right = cameras[1].RetrieveResult(
-                    20000, pylon.TimeoutHandling_ThrowException)
+                grabResult_left = None
+                grabResult_right = None
+                try:
+                    # Read camera data
+                    grabResult_left = cameras[0].RetrieveResult(
+                        20000, pylon.TimeoutHandling_ThrowException)
+                    grabResult_right = cameras[1].RetrieveResult(
+                        20000, pylon.TimeoutHandling_ThrowException)
+                except pylon.TimeoutException as e:
+                    print("Camera capture timeout exception", e)
 
                 time_since_save = time.time() - last_save_time
                 if time_since_save > save_rate:
@@ -273,24 +281,26 @@ def run(test_params: TitaniaTestParams) -> int:
 
                 if save_this_frame:
                     # Save camera images to file
-                    if grabResult_left.GrabSucceeded():
-                        left_success = "1"
-                        if test_params.save_images:
-                            img = grabResult_left.GetArray()
-                            left_image_filename = image_tag_time + "_l.png"
-                            left_image_filepath = os.path.join(
-                                test_params.output_folderpath,
-                                left_image_filename)
-                            cv2.imwrite(left_image_filepath, img)
-                    if grabResult_right.GrabSucceeded():
-                        right_success = "1"
-                        if test_params.save_images:
-                            img = grabResult_right.GetArray()
-                            right_image_filename = image_tag_time + "_r.png"
-                            right_image_filepath = os.path.join(
-                                test_params.output_folderpath,
-                                right_image_filename)
-                            cv2.imwrite(right_image_filepath, img)
+                    if grabResult_left is not None:
+                        if grabResult_left.GrabSucceeded():
+                            left_success = "1"
+                            if test_params.save_images:
+                                img = grabResult_left.GetArray()
+                                left_image_filename = image_tag_time + "_l.png"
+                                left_image_filepath = os.path.join(
+                                    test_params.output_folderpath,
+                                    left_image_filename)
+                                cv2.imwrite(left_image_filepath, img)
+                    if grabResult_right is not None:
+                        if grabResult_right.GrabSucceeded():
+                            right_success = "1"
+                            if test_params.save_images:
+                                img = grabResult_right.GetArray()
+                                right_image_filename = image_tag_time + "_r.png"
+                                right_image_filepath = os.path.join(
+                                    test_params.output_folderpath,
+                                    right_image_filename)
+                                cv2.imwrite(right_image_filepath, img)
 
                     if test_params.capture_temperature:
                         # Get temperature
@@ -350,6 +360,7 @@ def main() -> int:
     timeout = 0.0  # zero = no timeout
     save_images = True
     capture_temp = True
+    exposure = 110000.0  # us
 
     enableCameraEmulation(virtual_cams)
     # Check connected devices against arguments
@@ -373,7 +384,8 @@ def main() -> int:
         save_images=save_images,
         capture_temperature=capture_temp,
         virtual_camera=virtual_cams,
-        timeout=timeout
+        timeout=timeout,
+        exposure=exposure
     )
     validateTitaniaTestParams(test_params)
     # Run test
