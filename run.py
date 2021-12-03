@@ -23,6 +23,8 @@ def parse_args() -> argparse.Namespace:
         Disable saving of images during. \
         Image will still be grabbed from camera but \
         will not be saved to file.")
+    parser.add_argument('--enable_imu', action='store_true', help="\
+        Enable imu comms.")
     parser.add_argument('--left_serial', type=str, default="", help="\
         Camera serial number for left camera. \
         If not specified will connect to first two \
@@ -101,6 +103,12 @@ def main() -> int:
         # This shouldn't be possible as previous error checking
         # should always set serials or raise an exception
         raise Exception("Failed to get valid camera serials")
+    imu_port = None
+    if args.enable_imu:
+        # Check if imu device is avaiable (any serial device)
+        imu_port = TitaniaTest.getFirstSerialDevice()
+        if imu_port is None:
+            raise Exception("Failed to find serial device for IMU data")
     # Define test parameters
     test_params = TitaniaTest.TitaniaTestParams(
         left_serial=left_serial, right_serial=right_serial,
@@ -109,6 +117,8 @@ def main() -> int:
         save_fps=args.save_fps,
         save_images=(not args.disable_images),
         capture_temperature=(not args.disable_temp),
+        capture_imu=(args.enable_imu),
+        imu_port=imu_port,
         virtual_camera=args.virtual,
         timeout=args.timeout,
         exposure=args.exposure

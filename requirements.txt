@@ -1,3 +1,4 @@
 pypylon
+pyserial
 opencv-python
 keyboard

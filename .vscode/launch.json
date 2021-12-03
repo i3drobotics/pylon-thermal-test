@@ -19,11 +19,14 @@
             "args": [
                 // "--virtual",
                 // "--disable_images",
-                // "--left_serial","40091829",
-                // "--right_serial","40098273",
-                "--titania_serial","746974616e24318",
-                "--capture_fps","10",
-                "--save_fps","10"
+                "--left_serial", "40098266",
+                "--right_serial", "40098271",
+                "--enable_imu",
+                // "--titania_serial", "746974616e24318",
+                "--capture_fps", "8",
+                "--save_fps", "8",
+                "--exposure", "28658",
+                "--output", "./out/startup"
             ],
             "console": "integratedTerminal"
         }

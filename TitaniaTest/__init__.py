@@ -1,13 +1,15 @@
 import sys
 import os
+import glob
 import time
 import random
 import datetime
-import threading
+import serial
 from typing import NamedTuple
 import keyboard
 from pypylon import pylon, genicam
 import cv2
+from enum import Enum
 
 
 class TitaniaTestParams(NamedTuple):
@@ -18,6 +20,8 @@ class TitaniaTestParams(NamedTuple):
     save_fps: float
     save_images: bool
     capture_temperature: bool
+    capture_imu: bool
+    imu_port: str
     virtual_camera: bool
     timeout: float
     exposure: float
@@ -119,6 +123,45 @@ def getSerialPairConnected() -> list:
     return left_serial, right_serial
 
 
+def listAvailableSerialDevices() -> list:
+    """ Lists serial port names
+        :raises EnvironmentError:
+            On unsupported or unknown platforms
+        :returns:
+            A list of the serial ports available on the system
+    """
+    if sys.platform.startswith('win'):
+        # only look for COM port 2 +
+        ports = ['COM%s' % (i + 2) for i in range(256)]
+    elif sys.platform.startswith('linux'):
+        # this excludes your current terminal "/dev/tty"
+        ports = glob.glob('/dev/tty[A-Za-z]*')
+    elif sys.platform.startswith('cygwin'):
+        # this excludes your current terminal "/dev/tty"
+        ports = glob.glob('/dev/tty[A-Za-z]*')
+    elif sys.platform.startswith('darwin'):
+        ports = glob.glob('/dev/tty.*')
+    else:
+        raise EnvironmentError('Unsupported platform')
+
+    result = []
+    for port in ports:
+        try:
+            s = serial.Serial(port)
+            s.close()
+            result.append(port)
+        except (OSError, serial.SerialException):
+            pass
+    return result
+
+
+def getFirstSerialDevice() -> str:
+    device_list = listAvailableSerialDevices()
+    if len(device_list) <= 0:
+        return None
+    return device_list[0]
+
+
 def getCameraSerials() -> list:
     # Get camera serials of currently connected basler devices
     serial_list = []
@@ -155,16 +198,30 @@ def getLogFileName() -> str:
     return log_file_name
 
 
-def run(test_params: TitaniaTestParams) -> int:
+def saveFrame(excel_time, left_image_filename, right_image_filename,
+              left_temp, right_temp, test_params, imu_data,
+              left_success, right_success, imu_success,
+              log_filepath) -> None:
+    # Define log message
+    # time,left_img,right_img,left_temp,right_temp,[imu_data],left_success,right_success,[imu_success]
+    log_msg = excel_time \
+        + "," + left_image_filename + "," + right_image_filename \
+        + "," + left_temp + "," + right_temp
+    if test_params.capture_imu:
+        log_msg += "," + imu_data
+    log_msg += "," + left_success + "," + right_success
+    if test_params.capture_imu:
+        log_msg += "," + imu_success
+    log_msg += "\n"
+    print(log_msg)
 
-    exit_code = 0
-    # Generate names for filepaths
-    log_filename = getLogFileName()
-    log_filepath = os.path.join(test_params.output_folderpath, log_filename)
+    # Append log message line to file
+    f = open(log_filepath, "a")
+    f.write(log_msg)
+    f.close()
 
-    timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
-    print("Test started: ", timestamp)
 
+def connectCameras(test_params):
     try:
         # Get the transport layer factory.
         tlFactory = pylon.TlFactory.GetInstance()
@@ -216,136 +273,297 @@ def run(test_params: TitaniaTestParams) -> int:
             cameras[0].ReverseX.SetValue(True)
             cameras[0].ReverseY.SetValue(True)
 
-        # Write log file header line
-        header_msg = \
-            "time,left_img,right_img,left_temp,right_temp," \
-            + "left_success,right_success\n"
-        f = open(log_filepath, "w")
-        f.write(header_msg)
-        f.close()
-
-        # Calculate save rate (in seconds)
-        save_rate = 1.0 / test_params.save_fps
-        last_save_time = time.time()
-
     except genicam.GenericException as e:
         # Error handling
         print("Camera exception occurred during test setup: ", e)
-        exit_code = 1
-        return exit_code
+        exit(1)
+
+    return cameras
+
+
+def run(test_params: TitaniaTestParams) -> int:
+
+    exit_code = 0
+    # Generate names for filepaths
+    log_filename = getLogFileName()
+    log_filepath = os.path.join(test_params.output_folderpath, log_filename)
+
+    timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
+    print("Test started: ", timestamp)
+
+    if (test_params.capture_imu):
+        # connect to imu serial device 
+        imu_ser = serial.Serial(test_params.imu_port)
+        imu_ser.flushInput()
+
+    cameras = connectCameras(test_params)
+
+    # Write log file header line
+    header_msg = \
+        "time,left_img,right_img,left_temp,right_temp," \
+        + "left_success,right_success\n"
+    f = open(log_filepath, "w")
+    f.write(header_msg)
+    f.close()
+
+    # Calculate save rate (in seconds)
+    save_rate = 1.0 / test_params.save_fps
+    last_save_time = time.time()
 
     try:
         start_time = time.time()
         while True:
-            if test_params.timeout > 0:
-                test_duration = time.time() - start_time
-                if test_duration > test_params.timeout:
-                    exit_code = 0
-                    return exit_code
+            try:
+                if test_params.timeout > 0:
+                    test_duration = time.time() - start_time
+                    if test_duration > test_params.timeout:
+                        exit_code = 0
+                        break
 
-            # Get capture time
-            time_now = datetime.datetime.now()
-            # Convert to excel datetime serial
-            excel_time = time_now.strftime('%Y-%m-%d %H:%M:%S.%f')
-            image_tag_time = time_now.strftime('%Y-%m-%d_%H_%M_%S_%f')
+                # Get capture time
+                time_now = datetime.datetime.now()
+                # Convert to excel datetime serial
+                excel_time = time_now.strftime('%Y-%m-%d %H:%M:%S.%f')
+                image_tag_time = time_now.strftime('%Y-%m-%d_%H_%M_%S_%f')
 
-            # Define default values for log data
-            left_temp = ""
-            right_temp = ""
-            left_image_filename = ""
-            right_image_filename = ""
-            left_success = "0"
-            right_success = "0"
+                # Define default values for log data
+                left_temp = ""
+                right_temp = ""
+                imu_data = ""
+                left_image_filename = ""
+                right_image_filename = ""
+                left_success = "0"
+                right_success = "0"
+                imu_success = "0"
 
-            save_this_frame = False
+                reconnect_camera = False
 
-            grabbing = cameras.IsGrabbing()
+                save_this_frame = False
 
-            # Check cameras are grabbing
-            if grabbing:
-                grabResult_left = None
-                grabResult_right = None
+                if test_params.capture_imu:
+                    try:
+                        imu_ser.flushInput()
+                        ser_bytes = imu_ser.readline()
+                        ser_bytes = imu_ser.readline() # second read line to make sure complete data
+                        imu_data = ser_bytes.decode("utf-8").rstrip()
+                        imu_success = "1"
+                    except serial.SerialException as e:
+                        # There is no new data from serial port
+                        imu_data = ""
+                        imu_success = "SERAIL FAILED, Likely disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
+                        try:
+                            # try to re-connect
+                            imu_ser.close()
+                            imu_ser = serial.Serial(test_params.imu_port)
+                            imu_ser.flushInput()
+                        except serial.SerialException as e:
+                            pass
+                        except TypeError as e:
+                            pass
+                    except TypeError as e:
+                        # Disconnect of USB->UART occured
+                        imu_data = ""
+                        imu_success = "DISCONNECTED"
+                        try:
+                            # try to re-connect
+                            imu_ser.close()
+                            imu_ser = serial.Serial(test_params.imu_port)
+                            imu_ser.flushInput()
+                        except serial.SerialException as e:
+                            pass
+                        except TypeError as e:
+                            pass
+                    if imu_data != "":
+                        # split imu data string
+                        split_data = imu_data.split(",")
+                        if len(split_data) == 4:
+                            if split_data[1] != "-1000":
+                                imu_data = "({},{},{})".format(split_data[1], split_data[2], split_data[3])
+                                imu_success = "1"
+                            else:
+                                imu_data = ""
+                                imu_success = "IMU FAILED"
+                        else:
+                            imu_data = ""
+                            imu_success = "SERIAL FAILED"
+
                 try:
-                    # Read camera data
-                    grabResult_left = cameras[0].RetrieveResult(
-                        20000, pylon.TimeoutHandling_ThrowException)
-                    grabResult_right = cameras[1].RetrieveResult(
-                        20000, pylon.TimeoutHandling_ThrowException)
-                except pylon.TimeoutException as e:
-                    print("Camera capture timeout exception", e)
+                    grabbing = cameras.IsGrabbing()
+                except genicam.GenericException as e:
+                    left_success = "CAMERA ERROR, likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
+                    right_success = "CAMERA ERROR, likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
+                    grabbing = False
+                    reconnect_camera = True
+                except genicam.RuntimeException as e:
+                    left_success = "CAMERA RUNTIME ERROR, likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
+                    right_success = "CAMERA RUNTIME ERROR, likely camera disconnected:: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
+                    grabbing = False
+                    reconnect_camera = True
+                except pylon.RuntimeException as e:
+                    left_success = "CAMERA RUNTIME ERROR, likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
+                    right_success = "CAMERA RUNTIME ERROR, likely camera disconnected:: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
+                    grabbing = False
+                    reconnect_camera = True
 
-                time_since_save = time.time() - last_save_time
-                if time_since_save > save_rate:
-                    save_this_frame = True
-                    last_save_time = time.time()
+                # Check cameras are grabbing
+                if grabbing:
+                    grabResult_left = None
+                    grabResult_right = None
+                    # Read camera data
+                    try:
+                        grabResult_left = cameras[0].RetrieveResult(
+                            20000, pylon.TimeoutHandling_ThrowException)
+                    except pylon.TimeoutException as e:
+                        left_success = "CAMERA TIMEOUT"
+                    except genicam.GenericException as e:
+                        left_success = "CAMERA ERROR, likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
+                        reconnect_camera = True
+                    except genicam.RuntimeException as e:
+                        left_success = "CAMERA RUNTIME ERROR, likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
+                        reconnect_camera = True
+                    except pylon.RuntimeException as e:
+                        left_success = "CAMERA RUNTIME ERROR, likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
+                        reconnect_camera = True
+
+                    try:
+                        grabResult_right = cameras[1].RetrieveResult(
+                            20000, pylon.TimeoutHandling_ThrowException)
+                    except pylon.TimeoutException as e:
+                        right_success = "CAMERA TIMEOUT"
+                    except genicam.GenericException as e:
+                        right_success = "CAMERA ERROR, likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
+                        reconnect_camera = True
+                    except genicam.RuntimeException as e:
+                        right_success = "CAMERA RUNTIME ERROR, likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
+                        reconnect_camera = True
+                    except pylon.RuntimeException as e:
+                        right_success = "CAMERA RUNTIME ERROR, likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
+                        reconnect_camera = True
+
+                    time_since_save = time.time() - last_save_time
+                    if time_since_save > save_rate:
+                        save_this_frame = True
+                        last_save_time = time.time()
+
+                    if save_this_frame:
+                        # Save camera images to file
+                        try:
+                            if grabResult_left is not None:
+                                if grabResult_left.GrabSucceeded():
+                                    left_success = "1"
+                                    if test_params.save_images:
+                                        img = grabResult_left.GetArray()
+                                        left_image_filename = image_tag_time + "_l.png"
+                                        left_image_filepath = os.path.join(
+                                            test_params.output_folderpath,
+                                            left_image_filename)
+                                        cv2.imwrite(left_image_filepath, img)
+                                else:
+                                    left_success = "GRAB FAIL"
+                            else:
+                                left_success = "NO IMAGE DATA"
+                        except genicam.GenericException as e:
+                            left_success = "CAMERA ERROR, likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
+                            reconnect_camera = True
+                        except genicam.RuntimeException as e:
+                            left_success = "CAMERA RUNTIME ERROR, likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
+                            reconnect_camera = True
+                        except pylon.RuntimeException as e:
+                            left_success = "CAMERA RUNTIME ERROR, likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
+                            reconnect_camera = True
+
+                        try:
+                            if grabResult_right is not None:
+                                if grabResult_right.GrabSucceeded():
+                                    right_success = "1"
+                                    if test_params.save_images:
+                                        img = grabResult_right.GetArray()
+                                        right_image_filename = image_tag_time + "_r.png"
+                                        right_image_filepath = os.path.join(
+                                            test_params.output_folderpath,
+                                            right_image_filename)
+                                        cv2.imwrite(right_image_filepath, img)
+                                else:
+                                    right_success = "GRAB FAIL"
+                            else:
+                                right_success = "NO IMAGE DATA"
+                        except genicam.GenericException as e:
+                            right_success = "CAMERA ERROR, likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
+                            reconnect_camera = True
+                        except genicam.RuntimeException as e:
+                            right_success = "CAMERA RUNTIME ERROR, likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
+                            reconnect_camera = True
+                        except pylon.RuntimeException as e:
+                            right_success = "CAMERA RUNTIME ERROR, likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
+                            reconnect_camera = True
+
+                        if test_params.capture_temperature:
+                            # Get temperature
+                            if test_params.virtual_camera:
+                                # generate fake temperature values
+                                left_temp_data = random.uniform(30, 60)
+                                right_temp_data = random.uniform(30, 60)
+                            else:
+                                try:
+                                    # read temperature from cameras
+                                    left_temp_data = \
+                                        cameras[0].DeviceTemperature.GetValue()
+                                    right_temp_data = \
+                                        cameras[1].DeviceTemperature.GetValue()
+                                except genicam.GenericException as e:
+                                    left_success = "CAMERA ERROR, likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
+                                    right_success = "CAMERA ERROR, likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
+                                    reconnect_camera = True
+                                except genicam.RuntimeException as e:
+                                    left_success = "CAMERA RUNTIME ERROR, likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
+                                    right_success = "CAMERA RUNTIME ERROR, likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
+                                    reconnect_camera = True
+                                except pylon.RuntimeException as e:
+                                    left_success = "CAMERA RUNTIME ERROR, likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
+                                    right_success = "CAMERA RUNTIME ERROR, likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
+                                    reconnect_camera = True
+                            left_temp = "{:.3F}".format(left_temp_data)
+                            right_temp = "{:.3F}".format(right_temp_data)
+                else:
+                    left_success = "NOT GRABBING"
+                    right_success = "NOT GRABBING"
+                    reconnect_camera = True
 
                 if save_this_frame:
-                    # Save camera images to file
-                    if grabResult_left is not None:
-                        if grabResult_left.GrabSucceeded():
-                            left_success = "1"
-                            if test_params.save_images:
-                                img = grabResult_left.GetArray()
-                                left_image_filename = image_tag_time + "_l.png"
-                                left_image_filepath = os.path.join(
-                                    test_params.output_folderpath,
-                                    left_image_filename)
-                                cv2.imwrite(left_image_filepath, img)
-                    if grabResult_right is not None:
-                        if grabResult_right.GrabSucceeded():
-                            right_success = "1"
-                            if test_params.save_images:
-                                img = grabResult_right.GetArray()
-                                right_image_filename = image_tag_time + "_r.png"
-                                right_image_filepath = os.path.join(
-                                    test_params.output_folderpath,
-                                    right_image_filename)
-                                cv2.imwrite(right_image_filepath, img)
+                    saveFrame(excel_time, left_image_filename, right_image_filename,
+                        left_temp, right_temp, test_params, imu_data,
+                        left_success, right_success, imu_success,
+                        log_filepath)
 
-                    if test_params.capture_temperature:
-                        # Get temperature
-                        if test_params.virtual_camera:
-                            # generate fake temperature values
-                            left_temp_data = random.uniform(30, 60)
-                            right_temp_data = random.uniform(30, 60)
-                        else:
-                            # read temperature from cameras
-                            left_temp_data = \
-                                cameras[0].DeviceTemperature.GetValue()
-                            right_temp_data = \
-                                cameras[1].DeviceTemperature.GetValue()
-                        left_temp = "{:.3F}".format(left_temp_data)
-                        right_temp = "{:.3F}".format(right_temp_data)
+                if reconnect_camera:
+                    # try to restart camera connection
+                    try:
+                        cameras = connectCameras(test_params)
+                    except pylon.RuntimeException as e:
+                        print(str(e))
+                    except:
+                        print("Unexpected exception when trying to re-start grabbing:", sys.exc_info()[0])
 
-            if save_this_frame:
-                # Define log message
-                # time,left_img,right_img,left_temp,right_temp,left_success,right_success
-                log_msg = excel_time \
-                    + "," + left_image_filename + "," + right_image_filename \
-                    + "," + left_temp + "," + right_temp \
-                    + "," + left_success + "," + right_success \
-                    + "\n"
-                print(log_msg)
+                if keyboard.is_pressed("q"):
+                    print("Test manually stopped")
+                    exit_code = 1
+                    break
 
-                # Append log message line to file
-                f = open(log_filepath, "a")
-                f.write(log_msg)
-                f.close()
-
-            if keyboard.is_pressed("q"):
-                print("Test stopped")
-                break
-
+            except genicam.GenericException as e:
+                saveFrame(excel_time, left_image_filename, right_image_filename,
+                    left_temp, right_temp, test_params, imu_data,
+                    left_success, right_success, imu_success,
+                    log_filepath)
     except KeyboardInterrupt:
-        # Error handling
-        print("Test stopped.")
+        print("Test manually stopped.")
         exit_code = 0
         return exit_code
-    except genicam.GenericException as e:
-        # Error handling
-        print("Camera exception occurred during test: ", e)
+    except:
+        print("Unexpected exception during test:", sys.exc_info()[0])
         exit_code = 1
         return exit_code
+
+    return exit_code
 
 
 # Entry point used to debug Titania Test
@@ -360,6 +578,7 @@ def main() -> int:
     timeout = 0.0  # zero = no timeout
     save_images = True
     capture_temp = True
+    enable_imu = True
     exposure = 110000.0  # us
 
     enableCameraEmulation(virtual_cams)
@@ -375,6 +594,12 @@ def main() -> int:
         # This shouldn't be possible as previous error checking
         # should always set serials or raise an exception
         raise Exception("Failed to get valid camera serials")
+    imu_port = None
+    if enable_imu:
+        # Check if imu device is avaiable (any serial device)
+        imu_port = getFirstSerialDevice()
+        if imu_port is None:
+            raise Exception("Failed to find serial device for IMU data")
     # Define test parameters
     test_params = TitaniaTestParams(
         left_serial=left_serial, right_serial=right_serial,
@@ -383,6 +608,8 @@ def main() -> int:
         save_fps=save_fps,
         save_images=save_images,
         capture_temperature=capture_temp,
+        enable_imu=enable_imu,
+        imu_port=imu_port,
         virtual_camera=virtual_cams,
         timeout=timeout,
         exposure=exposure
