@@ -66,10 +66,6 @@ def parse_args() -> argparse.Namespace:
         raise Exception(err_msg)
     if args.timeout < 0.0:
         raise Exception("Timeout must be positive number in seconds.")
-    # Check output path exists
-    if not os.path.exists(args.output):
-        err_msg = "Output path does not exist: " + args.output
-        raise Exception(err_msg)
     # Save rate must be less than or equal to capture rate
     if args.save_fps > args.capture_fps:
         raise Exception("Save FPS must be less than or equal to capture FPS")

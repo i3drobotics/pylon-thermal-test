@@ -82,11 +82,6 @@ def validateTitaniaTestParams(test_params: TitaniaTestParams) -> bool:
     # Check valid camera serial
     if test_params.left_serial == "" and test_params.right_serial == "":
         raise Exception("Camera serial empty")
-    # Check output path exists
-    if not os.path.exists(test_params.output_folderpath):
-        err_msg = "Output path does not exist: " + \
-            test_params.output_folderpath
-        raise Exception(err_msg)
     # Save rate must be less than or equal to capture rate
     if test_params.save_fps > test_params.capture_fps:
         raise Exception("Save FPS must be less than or equal to capture FPS")
@@ -266,7 +261,7 @@ def connectCameras(test_params):
             else:
                 cam.AcquisitionFrameRate.SetValue(test_params.capture_fps)
             cam.AcquisitionFrameRateEnable.SetValue(True)
-        
+
         # Set exposure
         cameras[0].ExposureTime.SetValue(test_params.left_exposure)
         cameras[1].ExposureTime.SetValue(test_params.right_exposure)
@@ -289,13 +284,16 @@ def run(test_params: TitaniaTestParams) -> int:
     exit_code = 0
     # Generate names for filepaths
     log_filename = getLogFileName()
+    # create folder if it does not exist
+    if not os.path.exists(test_params.output_folderpath):
+        os.mkdir(test_params.output_folderpath)
     log_filepath = os.path.join(test_params.output_folderpath, log_filename)
 
     timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
     print("Test started: ", timestamp)
 
     if (test_params.capture_imu):
-        # connect to imu serial device 
+        # connect to imu serial device
         imu_ser = serial.Serial(test_params.imu_port)
         imu_ser.flushInput()
 
@@ -359,11 +357,11 @@ def run(test_params: TitaniaTestParams) -> int:
                             imu_ser.close()
                             imu_ser = serial.Serial(test_params.imu_port)
                             imu_ser.flushInput()
-                        except serial.SerialException as e:
+                        except serial.SerialException:
                             pass
-                        except TypeError as e:
+                        except TypeError:
                             pass
-                    except TypeError as e:
+                    except TypeError:
                         # Disconnect of USB->UART occured
                         imu_data = ""
                         imu_success = "DISCONNECTED"
@@ -372,9 +370,9 @@ def run(test_params: TitaniaTestParams) -> int:
                             imu_ser.close()
                             imu_ser = serial.Serial(test_params.imu_port)
                             imu_ser.flushInput()
-                        except serial.SerialException as e:
+                        except serial.SerialException:
                             pass
-                        except TypeError as e:
+                        except TypeError:
                             pass
                     if imu_data != "":
                         # split imu data string
