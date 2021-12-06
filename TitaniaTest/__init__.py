@@ -185,10 +185,7 @@ def getCameraSerials() -> list:
         return []
 
 
-def getLogFileName() -> str:
-    # Get current time
-    time_now = datetime.datetime.now()
-    timestamp = time_now.strftime('%Y-%m-%d_%H_%M_%S_%f')
+def getLogFileName(timstamp: str) -> str:
     # Create file name from unix time
     log_file_name = "TitaniaTest_" + timestamp + ".txt"
     return log_file_name
@@ -197,7 +194,7 @@ def getLogFileName() -> str:
 def saveFrame(excel_time, left_image_filename, right_image_filename,
               left_temp, right_temp, test_params, imu_data,
               left_success, right_success, imu_success,
-              log_filepath) -> None:
+              log_filepath, hour_log_filepath) -> None:
     # Define log message
     # time,left_img,right_img,left_temp,right_temp,[imu_data],left_success,right_success,[imu_success]
     log_msg = excel_time \
@@ -213,6 +210,11 @@ def saveFrame(excel_time, left_image_filename, right_image_filename,
 
     # Append log message line to file
     f = open(log_filepath, "a")
+    f.write(log_msg)
+    f.close()
+
+    # Append hour log message line to file
+    f = open(hour_log_filepath, "a")
     f.write(log_msg)
     f.close()
 
@@ -278,18 +280,28 @@ def connectCameras(test_params):
 
     return cameras
 
+def write_log_header(log_filepath):
+    # Write log file header line
+    header_msg = \
+        "time,left_img,right_img,left_temp,right_temp," \
+        + "left_success,right_success\n"
+    f = open(log_filepath, "w")
+    f.write(header_msg)
+    f.close()
+
 
 def run(test_params: TitaniaTestParams) -> int:
 
     exit_code = 0
+    test_start_time = datetime.datetime.now()
+    timestamp = test_start_time.strftime('%Y-%m-%d_%H_%M_%S_%f')
     # Generate names for filepaths
-    log_filename = getLogFileName()
+    log_filename = getLogFileName(timestamp)
     # create folder if it does not exist
     if not os.path.exists(test_params.output_folderpath):
         os.mkdir(test_params.output_folderpath)
     log_filepath = os.path.join(test_params.output_folderpath, log_filename)
 
-    timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
     print("Test started: ", timestamp)
 
     if (test_params.capture_imu):
@@ -300,12 +312,7 @@ def run(test_params: TitaniaTestParams) -> int:
     cameras = connectCameras(test_params)
 
     # Write log file header line
-    header_msg = \
-        "time,left_img,right_img,left_temp,right_temp," \
-        + "left_success,right_success\n"
-    f = open(log_filepath, "w")
-    f.write(header_msg)
-    f.close()
+    write_log_header(log_filepath)
 
     # Calculate save rate (in seconds)
     save_rate = 1.0 / test_params.save_fps
@@ -326,6 +333,14 @@ def run(test_params: TitaniaTestParams) -> int:
                 # Convert to excel datetime serial
                 excel_time = time_now.strftime('%Y-%m-%d %H:%M:%S.%f')
                 image_tag_time = time_now.strftime('%Y-%m-%d_%H_%M_%S_%f')
+
+                # Create new folder for data on every hour
+                hour_timestamp = time_now.strftime('%Y-%m-%d %H')
+                hour_folder_path = os.path.join(test_params.output_folderpath, hour_timestamp)
+                hour_log_filepath = os.path.join(hour_folder_path, getLogFileName(hour_timestamp))
+                if not os.path.exists(hour_folder_path):
+                    os.mkdir(hour_folder_path)
+                    write_log_header(hour_log_filepath)
 
                 # Define default values for log data
                 left_temp = ""
@@ -456,7 +471,7 @@ def run(test_params: TitaniaTestParams) -> int:
                                         img = grabResult_left.GetArray()
                                         left_image_filename = image_tag_time + "_l.png"
                                         left_image_filepath = os.path.join(
-                                            test_params.output_folderpath,
+                                            hour_folder_path,
                                             left_image_filename)
                                         cv2.imwrite(left_image_filepath, img)
                                 else:
@@ -481,7 +496,7 @@ def run(test_params: TitaniaTestParams) -> int:
                                         img = grabResult_right.GetArray()
                                         right_image_filename = image_tag_time + "_r.png"
                                         right_image_filepath = os.path.join(
-                                            test_params.output_folderpath,
+                                            hour_folder_path,
                                             right_image_filename)
                                         cv2.imwrite(right_image_filepath, img)
                                 else:
@@ -534,7 +549,7 @@ def run(test_params: TitaniaTestParams) -> int:
                     saveFrame(excel_time, left_image_filename, right_image_filename,
                         left_temp, right_temp, test_params, imu_data,
                         left_success, right_success, imu_success,
-                        log_filepath)
+                        log_filepath, hour_log_filepath)
 
                 if reconnect_camera:
                     # try to restart camera connection
