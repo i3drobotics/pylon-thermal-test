@@ -194,7 +194,7 @@ def getLogFileName(timestamp: str) -> str:
 def saveFrame(excel_time, left_image_filename, right_image_filename,
               left_temp, right_temp, test_params, imu_data,
               left_success, right_success, imu_success,
-              log_filepath, hour_log_filepath) -> None:
+              log_filepath, hour_log_filepath, day_log_filepath) -> None:
     # Define log message
     # time,left_img,right_img,left_temp,right_temp,[imu_data],left_success,right_success,[imu_success]
     log_msg = excel_time \
@@ -208,15 +208,12 @@ def saveFrame(excel_time, left_image_filename, right_image_filename,
     log_msg += "\n"
     print(log_msg)
 
-    # Append log message line to file
-    f = open(log_filepath, "a")
-    f.write(log_msg)
-    f.close()
-
-    # Append hour log message line to file
-    f = open(hour_log_filepath, "a")
-    f.write(log_msg)
-    f.close()
+    log_files = [log_filepath, hour_log_filepath, day_log_filepath]
+    for log_file in log_files:
+        # Append log message line to file
+        f = open(log_file, "a")
+        f.write(log_msg)
+        f.close()
 
 
 def connectCameras(test_params):
@@ -334,9 +331,17 @@ def run(test_params: TitaniaTestParams) -> int:
                 excel_time = time_now.strftime('%Y-%m-%d %H:%M:%S.%f')
                 image_tag_time = time_now.strftime('%Y-%m-%d_%H_%M_%S_%f')
 
+                # Create new folder for data on every day
+                day_timestamp = time_now.strftime('%Y-%m-%d')
+                day_folder_path = os.path.join(test_params.output_folderpath, day_timestamp)
+                day_log_filepath = os.path.join(day_folder_path, getLogFileName(day_timestamp))
+                if not os.path.exists(day_folder_path):
+                    os.makedirs(day_folder_path)
+                    write_log_header(day_log_filepath)
+
                 # Create new folder for data on every hour
-                hour_timestamp = time_now.strftime('%Y-%m-%d %H')
-                hour_folder_path = os.path.join(test_params.output_folderpath, hour_timestamp)
+                hour_timestamp = time_now.strftime('%H')
+                hour_folder_path = os.path.join(day_folder_path, hour_timestamp)
                 hour_log_filepath = os.path.join(hour_folder_path, getLogFileName(hour_timestamp))
                 if not os.path.exists(hour_folder_path):
                     os.makedirs(hour_folder_path)
@@ -549,7 +554,7 @@ def run(test_params: TitaniaTestParams) -> int:
                     saveFrame(excel_time, left_image_filename, right_image_filename,
                         left_temp, right_temp, test_params, imu_data,
                         left_success, right_success, imu_success,
-                        log_filepath, hour_log_filepath)
+                        log_filepath, hour_log_filepath, day_log_filepath)
 
                 if reconnect_camera:
                     # try to restart camera connection
