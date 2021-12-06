@@ -340,9 +340,9 @@ def run(test_params: TitaniaTestParams) -> int:
                     write_log_header(day_log_filepath)
 
                 # Create new folder for data on every hour
-                hour_timestamp = time_now.strftime('%H')
-                hour_folder_path = os.path.join(day_folder_path, hour_timestamp)
-                hour_log_filepath = os.path.join(hour_folder_path, getLogFileName(hour_timestamp))
+                day_hour_timestamp = time_now.strftime('%Y-%m-%d %H')
+                hour_folder_path = os.path.join(day_folder_path, day_hour_timestamp)
+                hour_log_filepath = os.path.join(hour_folder_path, getLogFileName(day_hour_timestamp))
                 if not os.path.exists(hour_folder_path):
                     os.makedirs(hour_folder_path)
                     write_log_header(hour_log_filepath)
