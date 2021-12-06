@@ -17,17 +17,21 @@ The following options are available on the command line to setup the type of tes
 python run.py --option variable
 ```
 
-| Option         | Type    | Description                                                                                                                            | Default |
-|----------------|---------|----------------------------------------------------------------------------------------------------------------------------------------|---------|
-| output         | string  | Folderpath to store test results. Test data includes log file of results and any images captured during the test.                      | "."     |
-| capture_fps    | float   | Data capture rate (frames per second). All data is captured in sync.                                                                   |  1      |
-| save_fps       | float   | Data save rate (frames per second). MUST be less than or equal to capture_fps.                                                         |  1      |
-| disable_temp   | bool    | Disable capturing of temperature data from cameras during test.                                                                        | False   |
-| disable_images | bool    | Disable saving of images during. Image will still be grabbed from camera but will not be saved to file.                                | False   |
-| titania_serial | string  | Titania unique serial number. Found printed on the back of Titania. Specify this or directly specify left and right serials. If no serials are specified will connected to the first two basler cameras found connected. | ""      |
-| left_serial    | string  | camera serial number for left camera. If no serials are specified will connected to the first two basler cameras found connected.      | ""      |
-| right_serial   | string  | camera serial number for right camera. If no serials are specified will connected to the first two basler cameras found connected.     | ""      |
-| virtual        | bool    | Enable camera emulation. Useful for internal testing. Cameras are expected with serials '0815-0000' & '0815-0001'                      | False   |
+| Option         | Type   | Description                                                                                                                        | Default  |
+|----------------|--------|------------------------------------------------------------------------------------------------------------------------------------|----------|
+| output         | string | Folderpath to store test results. Test data includes log file of results and any images captured during the test.                  | "."      |
+| capture_fps    | float  | Data capture rate (frames per second). All data is captured in sync.                                                               | 1        |
+| save_fps       | float  | Data save rate (frames per second). MUST be less than or equal to capture_fps.                                                     | 1        |
+| disable_temp   | bool   | Disable capturing of temperature data from cameras during test.                                                                    | False    |
+| disable_images | bool   | Disable saving of images during. Image will still be grabbed from camera but will not be saved to file.                            | False    |
+| enable_imu     | bool   | Enable IMU data capture. This is not normally accessible for Titania cameras but can be directly read separately on the board.     | False    |
+| titania_serial | string | Titania unique serial number. Found printed on the back of Titania. Specify this or directly specify left and right serials.       | ""       |
+| left_serial    | string | camera serial number for left camera. If no serials are specified will connected to the first two basler cameras found connected.  | ""       |
+| right_serial   | string | camera serial number for right camera. If no serials are specified will connected to the first two basler cameras found connected. | ""       |
+| virtual        | bool   | Enable camera emulation. Useful for internal testing. Cameras are expected with serials '0815-0000' & '0815-0001'                  | False    |
+| timeout        | float  | Maximum time to run test (seconds). To run forever use 0.0, this is the default behaviour.                                         | 0.0      |
+| left_exposure  | float  | Left camera exposure (us).                                                                                                         | 110000.0 |
+| right_exposure | float  | Right camera exposure (us).                                                                                                        | 110000.0 |
 
 Boolean options are False if omitted and True if provided. e.g.
 ```
