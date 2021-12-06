@@ -25,7 +25,8 @@
                 // "--titania_serial", "746974616e24318",
                 "--capture_fps", "8",
                 "--save_fps", "8",
-                "--exposure", "28658",
+                "--left_exposure", "28658",
+                "--right_exposure", "28658",
                 "--output", "./out/startup"
             ],
             "console": "integratedTerminal"

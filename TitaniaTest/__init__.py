@@ -24,7 +24,8 @@ class TitaniaTestParams(NamedTuple):
     imu_port: str
     virtual_camera: bool
     timeout: float
-    exposure: float
+    right_exposure: float
+    left_exposure: float
 
 
 def getLeftRightSerialFromTitaniaSerial(titania_serial: str) -> str:
@@ -265,8 +266,10 @@ def connectCameras(test_params):
             else:
                 cam.AcquisitionFrameRate.SetValue(test_params.capture_fps)
             cam.AcquisitionFrameRateEnable.SetValue(True)
-            # Set exposure
-            cam.ExposureTime.SetValue(test_params.exposure)
+        
+        # Set exposure
+        cameras[0].ExposureTime.SetValue(test_params.left_exposure)
+        cameras[1].ExposureTime.SetValue(test_params.right_exposure)
 
         # Flip left camera images
         if not test_params.virtual_camera:
@@ -612,7 +615,8 @@ def main() -> int:
         imu_port=imu_port,
         virtual_camera=virtual_cams,
         timeout=timeout,
-        exposure=exposure
+        left_exposure=exposure,
+        right_exposure=exposure
     )
     validateTitaniaTestParams(test_params)
     # Run test

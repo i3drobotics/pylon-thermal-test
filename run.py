@@ -41,8 +41,10 @@ def parse_args() -> argparse.Namespace:
         Cameras are expected with serials '0815-0000' & '0815-0001'")
     parser.add_argument('--timeout', type=float, default=0.0, help="\
         Maximum time to run test (seconds).")
-    parser.add_argument('--exposure', type=float, default=110000.0, help="\
-        Camera exposure (us)")
+    parser.add_argument('--left_exposure', type=float, default=110000.0, help="\
+        Left camera exposure (us)")
+    parser.add_argument('--right_exposure', type=float, default=110000.0, help="\
+        Right camera exposure (us)")
     args = parser.parse_args()
     # Check arguments are valid
     # If one camera serial is given then both must be given
@@ -121,7 +123,8 @@ def main() -> int:
         imu_port=imu_port,
         virtual_camera=args.virtual,
         timeout=args.timeout,
-        exposure=args.exposure
+        left_exposure=args.left_exposure,
+        right_exposure=args.right_exposure
     )
     TitaniaTest.validateTitaniaTestParams(test_params)
     # Run test
