@@ -185,7 +185,7 @@ def getCameraSerials() -> list:
         return []
 
 
-def getLogFileName(timstamp: str) -> str:
+def getLogFileName(timestamp: str) -> str:
     # Create file name from unix time
     log_file_name = "TitaniaTest_" + timestamp + ".txt"
     return log_file_name
