@@ -299,7 +299,7 @@ def run(test_params: TitaniaTestParams) -> int:
     log_filename = getLogFileName(timestamp)
     # create folder if it does not exist
     if not os.path.exists(test_params.output_folderpath):
-        os.mkdir(test_params.output_folderpath)
+        os.makedirs(test_params.output_folderpath)
     log_filepath = os.path.join(test_params.output_folderpath, log_filename)
 
     print("Test started: ", timestamp)
@@ -339,7 +339,7 @@ def run(test_params: TitaniaTestParams) -> int:
                 hour_folder_path = os.path.join(test_params.output_folderpath, hour_timestamp)
                 hour_log_filepath = os.path.join(hour_folder_path, getLogFileName(hour_timestamp))
                 if not os.path.exists(hour_folder_path):
-                    os.mkdir(hour_folder_path)
+                    os.makedirs(hour_folder_path)
                     write_log_header(hour_log_filepath)
 
                 # Define default values for log data
