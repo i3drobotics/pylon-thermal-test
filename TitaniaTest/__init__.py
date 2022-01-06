@@ -277,11 +277,16 @@ def connectCameras(test_params):
 
     return cameras
 
-def write_log_header(log_filepath):
+def write_log_header(log_filepath, test_params):
     # Write log file header line
-    header_msg = \
-        "time,left_img,right_img,left_temp,right_temp," \
-        + "left_success,right_success\n"
+    if test_params.capture_imu:
+        header_msg = \
+            "time,left_img,right_img,left_temp,right_temp,imu_data" \
+            + "left_success,right_success,serial_success\n"
+    else:
+        header_msg = \
+            "time,left_img,right_img,left_temp,right_temp" \
+            + "left_success,right_success\n"
     f = open(log_filepath, "w")
     f.write(header_msg)
     f.close()
@@ -309,7 +314,7 @@ def run(test_params: TitaniaTestParams) -> int:
     cameras = connectCameras(test_params)
 
     # Write log file header line
-    write_log_header(log_filepath)
+    write_log_header(log_filepath, test_params)
 
     # Calculate save rate (in seconds)
     save_rate = 1.0 / test_params.save_fps
@@ -337,7 +342,7 @@ def run(test_params: TitaniaTestParams) -> int:
                 day_log_filepath = os.path.join(day_folder_path, getLogFileName(day_timestamp))
                 if not os.path.exists(day_folder_path):
                     os.makedirs(day_folder_path)
-                    write_log_header(day_log_filepath)
+                    write_log_header(day_log_filepath, test_params)
 
                 # Create new folder for data on every hour
                 day_hour_timestamp = time_now.strftime('%Y-%m-%d %H')
@@ -345,7 +350,7 @@ def run(test_params: TitaniaTestParams) -> int:
                 hour_log_filepath = os.path.join(hour_folder_path, getLogFileName(day_hour_timestamp))
                 if not os.path.exists(hour_folder_path):
                     os.makedirs(hour_folder_path)
-                    write_log_header(hour_log_filepath)
+                    write_log_header(hour_log_filepath, test_params)
 
                 # Define default values for log data
                 left_temp = ""
@@ -371,7 +376,7 @@ def run(test_params: TitaniaTestParams) -> int:
                     except serial.SerialException as e:
                         # There is no new data from serial port
                         imu_data = ""
-                        imu_success = "SERAIL FAILED, Likely disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
+                        imu_success = "SERAIL FAILED. Likely disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
                         try:
                             # try to re-connect
                             imu_ser.close()
@@ -399,7 +404,7 @@ def run(test_params: TitaniaTestParams) -> int:
                         split_data = imu_data.split(",")
                         if len(split_data) == 4:
                             if split_data[1] != "-1000":
-                                imu_data = "({},{},{})".format(split_data[1], split_data[2], split_data[3])
+                                imu_data = "({};{};{})".format(split_data[1], split_data[2], split_data[3])
                                 imu_success = "1"
                             else:
                                 imu_data = ""
@@ -411,18 +416,18 @@ def run(test_params: TitaniaTestParams) -> int:
                 try:
                     grabbing = cameras.IsGrabbing()
                 except genicam.GenericException as e:
-                    left_success = "CAMERA ERROR, likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
-                    right_success = "CAMERA ERROR, likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
+                    left_success = "CAMERA ERROR. likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
+                    right_success = "CAMERA ERROR. likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
                     grabbing = False
                     reconnect_camera = True
                 except genicam.RuntimeException as e:
-                    left_success = "CAMERA RUNTIME ERROR, likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
-                    right_success = "CAMERA RUNTIME ERROR, likely camera disconnected:: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
+                    left_success = "CAMERA RUNTIME ERROR. likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
+                    right_success = "CAMERA RUNTIME ERROR. likely camera disconnected:: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
                     grabbing = False
                     reconnect_camera = True
                 except pylon.RuntimeException as e:
-                    left_success = "CAMERA RUNTIME ERROR, likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
-                    right_success = "CAMERA RUNTIME ERROR, likely camera disconnected:: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
+                    left_success = "CAMERA RUNTIME ERROR. likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
+                    right_success = "CAMERA RUNTIME ERROR. likely camera disconnected:: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
                     grabbing = False
                     reconnect_camera = True
 
@@ -437,13 +442,13 @@ def run(test_params: TitaniaTestParams) -> int:
                     except pylon.TimeoutException as e:
                         left_success = "CAMERA TIMEOUT"
                     except genicam.GenericException as e:
-                        left_success = "CAMERA ERROR, likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
+                        left_success = "CAMERA ERROR. likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
                         reconnect_camera = True
                     except genicam.RuntimeException as e:
-                        left_success = "CAMERA RUNTIME ERROR, likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
+                        left_success = "CAMERA RUNTIME ERROR. likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
                         reconnect_camera = True
                     except pylon.RuntimeException as e:
-                        left_success = "CAMERA RUNTIME ERROR, likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
+                        left_success = "CAMERA RUNTIME ERROR. likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
                         reconnect_camera = True
 
                     try:
@@ -452,13 +457,13 @@ def run(test_params: TitaniaTestParams) -> int:
                     except pylon.TimeoutException as e:
                         right_success = "CAMERA TIMEOUT"
                     except genicam.GenericException as e:
-                        right_success = "CAMERA ERROR, likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
+                        right_success = "CAMERA ERROR. likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
                         reconnect_camera = True
                     except genicam.RuntimeException as e:
-                        right_success = "CAMERA RUNTIME ERROR, likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
+                        right_success = "CAMERA RUNTIME ERROR. likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
                         reconnect_camera = True
                     except pylon.RuntimeException as e:
-                        right_success = "CAMERA RUNTIME ERROR, likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
+                        right_success = "CAMERA RUNTIME ERROR. likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
                         reconnect_camera = True
 
                     time_since_save = time.time() - last_save_time
@@ -484,13 +489,13 @@ def run(test_params: TitaniaTestParams) -> int:
                             else:
                                 left_success = "NO IMAGE DATA"
                         except genicam.GenericException as e:
-                            left_success = "CAMERA ERROR, likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
+                            left_success = "CAMERA ERROR. likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
                             reconnect_camera = True
                         except genicam.RuntimeException as e:
-                            left_success = "CAMERA RUNTIME ERROR, likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
+                            left_success = "CAMERA RUNTIME ERROR. likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
                             reconnect_camera = True
                         except pylon.RuntimeException as e:
-                            left_success = "CAMERA RUNTIME ERROR, likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
+                            left_success = "CAMERA RUNTIME ERROR. likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
                             reconnect_camera = True
 
                         try:
@@ -509,13 +514,13 @@ def run(test_params: TitaniaTestParams) -> int:
                             else:
                                 right_success = "NO IMAGE DATA"
                         except genicam.GenericException as e:
-                            right_success = "CAMERA ERROR, likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
+                            right_success = "CAMERA ERROR. likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
                             reconnect_camera = True
                         except genicam.RuntimeException as e:
-                            right_success = "CAMERA RUNTIME ERROR, likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
+                            right_success = "CAMERA RUNTIME ERROR. likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
                             reconnect_camera = True
                         except pylon.RuntimeException as e:
-                            right_success = "CAMERA RUNTIME ERROR, likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
+                            right_success = "CAMERA RUNTIME ERROR. likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
                             reconnect_camera = True
 
                         if test_params.capture_temperature:
@@ -532,16 +537,16 @@ def run(test_params: TitaniaTestParams) -> int:
                                     right_temp_data = \
                                         cameras[1].DeviceTemperature.GetValue()
                                 except genicam.GenericException as e:
-                                    left_success = "CAMERA ERROR, likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
-                                    right_success = "CAMERA ERROR, likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
+                                    left_success = "CAMERA ERROR. likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
+                                    right_success = "CAMERA ERROR. likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
                                     reconnect_camera = True
                                 except genicam.RuntimeException as e:
-                                    left_success = "CAMERA RUNTIME ERROR, likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
-                                    right_success = "CAMERA RUNTIME ERROR, likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
+                                    left_success = "CAMERA RUNTIME ERROR. likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
+                                    right_success = "CAMERA RUNTIME ERROR. likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
                                     reconnect_camera = True
                                 except pylon.RuntimeException as e:
-                                    left_success = "CAMERA RUNTIME ERROR, likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
-                                    right_success = "CAMERA RUNTIME ERROR, likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
+                                    left_success = "CAMERA RUNTIME ERROR. likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
+                                    right_success = "CAMERA RUNTIME ERROR. likely camera disconnected: {}".format(str(e).replace('\n', ' ').replace('\r', '').replace(',', '.'))
                                     reconnect_camera = True
                             left_temp = "{:.3F}".format(left_temp_data)
                             right_temp = "{:.3F}".format(right_temp_data)
