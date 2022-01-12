@@ -194,14 +194,15 @@ def saveFrame(excel_time, left_image_filename, right_image_filename,
               left_temp, right_temp, test_params, external_serial_data,
               left_success, right_success, external_serial_success,
               log_filepath, hour_log_filepath, day_log_filepath) -> None:
-    # Define log message
-    # time,left_img,right_img,left_temp,right_temp,[external_serial_data],left_success,right_success,[external_serial_success]
-    log_msg = excel_time \
-        + "," + left_image_filename + "," + right_image_filename \
-        + "," + left_temp + "," + right_temp
+    # create log message
+    log_msg = excel_time+","
+    if test_params.save_images:
+        log_msg += left_image_filename + "," + right_image_filename + ","
+    if test_params.capture_temperature:
+        log_msg += left_temp + "," + right_temp + ","
     if test_params.enable_external_serial:
-        log_msg += "," + external_serial_data
-    log_msg += "," + left_success + "," + right_success
+        log_msg += external_serial_data + ","
+    log_msg += left_success + "," + right_success
     if test_params.enable_external_serial:
         log_msg += "," + external_serial_success
     log_msg += "\n"
@@ -278,15 +279,19 @@ def connectCameras(test_params):
 
 
 def write_log_header(log_filepath, test_params):
-    # Write log file header line
+    # create log file header line
+    header_msg = "time,"
+    if test_params.save_images:
+        header_msg += "left_img,right_img,"
+    if test_params.capture_temperature:
+        header_msg += "left_temp,right_temp,"
     if test_params.enable_external_serial:
-        header_msg = \
-            "time,left_img,right_img,left_temp,right_temp,external_data" \
-            + "left_success,right_success,external_success\n"
-    else:
-        header_msg = \
-            "time,left_img,right_img,left_temp,right_temp" \
-            + "left_success,right_success\n"
+        header_msg += "external_data,"
+    header_msg += "left_success,right_success"
+    if test_params.enable_external_serial:
+        header_msg += ",external_success"
+    header_msg += "\n"
+    # write to file
     f = open(log_filepath, "w")
     f.write(header_msg)
     f.close()
