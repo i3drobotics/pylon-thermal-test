@@ -5,6 +5,13 @@ These tests include the following:
  - Image data capture
  - Logging of test results
 
+## Install
+Required Python v3.5, 3.6, 3.7, or 3.8
+Install required packages using pip:
+```
+python -m pip install -r requirements.txt
+```
+
 ## Run
 To test a Titania system, plug the camera USB into a USB 3.0 port on your machine.  
 Then run the test with the python test script:
