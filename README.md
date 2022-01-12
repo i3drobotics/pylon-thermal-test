@@ -31,7 +31,7 @@ python run.py --option variable
 | save_fps       | float  | Data save rate (frames per second). MUST be less than or equal to capture_fps.                                                     | 1        |
 | disable_temp   | bool   | Disable capturing of temperature data from cameras during test.                                                                    | False    |
 | disable_images | bool   | Disable saving of images during. Image will still be grabbed from camera but will not be saved to file.                            | False    |
-| enable_imu     | bool   | Enable IMU data capture. This is not normally accessible for Titania cameras but can be directly read separately on the board.     | False    |
+| enable_external_serial     | bool   | Enable data capture from external serial device. Will use first serial device found.     | False    |
 | titania_serial | string | Titania unique serial number. Found printed on the back of Titania. Specify this or directly specify left and right serials.       | ""       |
 | left_serial    | string | camera serial number for left camera. If no serials are specified will connected to the first two basler cameras found connected.  | ""       |
 | right_serial   | string | camera serial number for right camera. If no serials are specified will connected to the first two basler cameras found connected. | ""       |

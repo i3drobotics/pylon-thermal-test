@@ -23,8 +23,12 @@ def parse_args() -> argparse.Namespace:
         Disable saving of images during. \
         Image will still be grabbed from camera but \
         will not be saved to file.")
-    parser.add_argument('--enable_imu', action='store_true', help="\
-        Enable imu comms.")
+    parser.add_argument('--enable_external_serial', action='store_true', help="\
+        Enable external serial comms.")
+    parser.add_argument('--external_serial_port', type=str, default="", help="\
+        Serial port for external device. \
+        If not specified will use first device found. \
+        Requires 'enable_external_serial' to be set.")
     parser.add_argument('--left_serial', type=str, default="", help="\
         Camera serial number for left camera. \
         If not specified will connect to first two \
@@ -51,6 +55,7 @@ def parse_args() -> argparse.Namespace:
     left_serial_given = args.left_serial != ""
     right_serial_given = args.right_serial != ""
     titania_serial_given = args.titania_serial != ""
+    external_serial_given = args.external_serial_port != ""
     if left_serial_given and not right_serial_given:
         err_msg = "left_serial given without right_serial. \
             Both left and right MUST be given if specifing camera serials."
@@ -63,6 +68,10 @@ def parse_args() -> argparse.Namespace:
         err_msg = "Cannot specify titania_serial \
             and left_serial or right_serial. If you have titania serial \
             left_serial and right_serial are no longer requred."
+        raise Exception(err_msg)
+    if external_serial_given and args.enable_external_serial:
+        err_msg = "External serial provided but external serial is not enabled. \
+            add '--enable_external_serial' to enable external serial."
         raise Exception(err_msg)
     if args.timeout < 0.0:
         raise Exception("Timeout must be positive number in seconds.")
@@ -101,12 +110,22 @@ def main() -> int:
         # This shouldn't be possible as previous error checking
         # should always set serials or raise an exception
         raise Exception("Failed to get valid camera serials")
-    imu_port = None
-    if args.enable_imu:
-        # Check if imu device is avaiable (any serial device)
-        imu_port = TitaniaTest.getFirstSerialDevice()
-        if imu_port is None:
-            raise Exception("Failed to find serial device for IMU data")
+    external_serial_port = None
+    if args.enable_external_serial:
+        if args.external_serial_port == "":
+            # Check if external serial device is avaiable
+            external_serial_port = TitaniaTest.getFirstSerialDevice()
+            if external_serial_port is None:
+                raise Exception(
+                    "Failed to find serial comms device for external data")
+        else:
+            serial_list = TitaniaTest.listAvailableSerialDevices()
+            if args.external_serial_port not in serial_list:
+                raise Exception(
+                    "Failed to find specifed serial comms \
+                        device for external data collection.")
+            external_serial_port = args.external_serial_port
+
     # Define test parameters
     test_params = TitaniaTest.TitaniaTestParams(
         left_serial=left_serial, right_serial=right_serial,
@@ -115,8 +134,8 @@ def main() -> int:
         save_fps=args.save_fps,
         save_images=(not args.disable_images),
         capture_temperature=(not args.disable_temp),
-        capture_imu=(args.enable_imu),
-        imu_port=imu_port,
+        enable_external_serial=(args.enable_external_serial),
+        external_serial_port=external_serial_port,
         virtual_camera=args.virtual,
         timeout=args.timeout,
         left_exposure=args.left_exposure,
