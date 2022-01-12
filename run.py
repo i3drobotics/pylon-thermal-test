@@ -69,7 +69,7 @@ def parse_args() -> argparse.Namespace:
             and left_serial or right_serial. If you have titania serial \
             left_serial and right_serial are no longer requred."
         raise Exception(err_msg)
-    if external_serial_given and args.enable_external_serial:
+    if external_serial_given and not args.enable_external_serial:
         err_msg = "External serial provided but external serial is not enabled. \
             add '--enable_external_serial' to enable external serial."
         raise Exception(err_msg)
